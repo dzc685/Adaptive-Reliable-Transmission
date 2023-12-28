@@ -2431,6 +2431,7 @@ int CUDT::processData(CUnit* unit)
    // Loss detection.
    if (CSeqNo::seqcmp(packet.m_iSeqNo, CSeqNo::incseq(m_iRcvCurrSeqNo)) > 0)
    {
+      return 0;//接收端不再检测丢包  接收端在这里将nack填入队列
       // If loss found, insert them to the receiver loss list
       m_pRcvLossList->insert(CSeqNo::incseq(m_iRcvCurrSeqNo), CSeqNo::decseq(packet.m_iSeqNo));
 
