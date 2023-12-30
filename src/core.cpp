@@ -55,6 +55,8 @@ written by
 #include <fstream>
 #include <cmath>
 #include <sstream>
+#include <random>
+#include <iostream>
 #include "queue.h"
 #include "core.h"
 
@@ -2430,22 +2432,37 @@ int CUDT::processData(CUnit* unit)
 
    // Loss detection.
    if (CSeqNo::seqcmp(packet.m_iSeqNo, CSeqNo::incseq(m_iRcvCurrSeqNo)) > 0)
-   {
-      return 0;//接收端不再检测丢包  接收端在这里将nack填入队列
-      // If loss found, insert them to the receiver loss list
-      m_pRcvLossList->insert(CSeqNo::incseq(m_iRcvCurrSeqNo), CSeqNo::decseq(packet.m_iSeqNo));
+   {//接收端检测到丢包，进入概率判断
+      
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::uniform_int_distribution<int> dis(0, 99);
 
-      // pack loss list for NAK
-      int32_t lossdata[2];
-      lossdata[0] = CSeqNo::incseq(m_iRcvCurrSeqNo) | 0x80000000;
-      lossdata[1] = CSeqNo::decseq(packet.m_iSeqNo);
+      //接收端检测到丢包后省略发送nack的概率
+      int probability = 20;
 
-      // Generate loss report immediately.
-      sendCtrl(3, NULL, lossdata, (CSeqNo::incseq(m_iRcvCurrSeqNo) == CSeqNo::decseq(packet.m_iSeqNo)) ? 1 : 2);
+      int random_number = dis(gen);
+      if (random_number < probability) {
+         std::cout << "接收端检测丢包，但是被省略" << std::endl;
+         
+      } else {
+         std::cout << "接收端检测丢包" << std::endl;
+         // If loss found, insert them to the receiver loss list
+         m_pRcvLossList->insert(CSeqNo::incseq(m_iRcvCurrSeqNo), CSeqNo::decseq(packet.m_iSeqNo));
 
-      int loss = CSeqNo::seqlen(m_iRcvCurrSeqNo, packet.m_iSeqNo) - 2;
-      m_iTraceRcvLoss += loss;
-      m_iRcvLossTotal += loss;
+         // pack loss list for NAK
+         int32_t lossdata[2];
+         lossdata[0] = CSeqNo::incseq(m_iRcvCurrSeqNo) | 0x80000000;
+         lossdata[1] = CSeqNo::decseq(packet.m_iSeqNo);
+
+         // Generate loss report immediately.
+         sendCtrl(3, NULL, lossdata, (CSeqNo::incseq(m_iRcvCurrSeqNo) == CSeqNo::decseq(packet.m_iSeqNo)) ? 1 : 2);
+
+         int loss = CSeqNo::seqlen(m_iRcvCurrSeqNo, packet.m_iSeqNo) - 2;
+         m_iTraceRcvLoss += loss;
+         m_iRcvLossTotal += loss;
+      }
+
    }
 
    // This is not a regular fixed size packet...   
